@@ -1,62 +1,57 @@
-import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import os
 from dotenv import load_dotenv
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import openai
 
-# Load environment variables from .env file
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Set the OpenAI API key
 openai.api_key = OPENAI_API_KEY
 
-# Set up logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Define the reply keyboard layout
-reply_keyboard = [
-    ["Ask for Advice", "Explain Like I’m 5"],
-    ["Daily Reflection", "Gratitude Prompt"],
-    ["Personal Productivity Coach", "Brainstorm Buddy"]
-]
-keyboard_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a welcome message with the custom keyboard."""
-    welcome_text = "Welcome! Choose one of the options below to get started."
-    await update.message.reply_text(welcome_text, reply_markup=keyboard_markup)
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Respond to button presses with a placeholder message."""
-    await update.message.reply_text("This feature is coming soon...")
-
-async def get_openai_response(prompt: str) -> str:
-    """Generate a response from OpenAI's GPT-4 model."""
+async def get_openai_response(prompt):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message['content'].strip()
-    except Exception as error:
-        logger.error(f"OpenAI API error: {error}")
-        return "Sorry, something went wrong while contacting OpenAI."
+        return response.choices[0].message.content
+    except Exception as e:
+        logging.error(f"Error fetching response from OpenAI: {e}")
+        return "Sorry, I couldn't process that right now."
 
-async def main() -> None:
-    """Launch the Telegram bot."""
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [["Tell me a joke", "Motivate me", "Give me a productivity tip"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+    prompt = ""
 
-    await application.run_polling()
+    if user_message == "Tell me a joke":
+        prompt = "Tell me a clean short one-line joke."
+    elif user_message == "Motivate me":
+        prompt = "Give me a short motivational quote."
+    elif user_message == "Give me a productivity tip":
+        prompt = "Give me a short productivity tip."
+
+    if prompt:
+        response = await get_openai_response(prompt)
+        await update.message.reply_text(response)
+
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    await app.run_polling()
 
 if __name__ == "__main__":
     import asyncio

@@ -22,8 +22,8 @@ async def get_openai_response(prompt):
         )
         return response.choices[0].message.content
     except Exception as e:
-        logging.error(f"Error fetching response from OpenAI: {e}")
-        return "Sorry, I couldn't process that right now."
+        logging.error(f"OpenAI API error: {e}")
+        return "Sorry, I encountered an error processing your request."
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [["Tell me a joke", "Motivate me", "Give me a productivity tip"]]
@@ -31,28 +31,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-    prompt = ""
+    prompts = {
+        "Tell me a joke": "Tell me a clean short one-line joke.",
+        "Motivate me": "Give me a short motivational quote.",
+        "Give me a productivity tip": "Give me a short productivity tip."
+    }
 
-    if user_message == "Tell me a joke":
-        prompt = "Tell me a clean short one-line joke."
-    elif user_message == "Motivate me":
-        prompt = "Give me a short motivational quote."
-    elif user_message == "Give me a productivity tip":
-        prompt = "Give me a short productivity tip."
+    user_message = update.message.text
+    prompt = prompts.get(user_message)
 
     if prompt:
         response = await get_openai_response(prompt)
         await update.message.reply_text(response)
 
-async def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    await app.run_polling()
-
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    application.run_polling()
